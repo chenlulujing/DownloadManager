@@ -80,7 +80,7 @@ public class DownloadManager {
 
         recoveryTaskState();
         mClient = client;
-        mThreadCount = threadCount < 1 ? 1 : threadCount <= Constants.MAX_THREAD_COUNT ? threadCount : Constants.MAX_THREAD_COUNT;
+        mThreadCount = threadCount < 1 ? 1 :( threadCount <= Constants.MAX_THREAD_COUNT ? threadCount : Constants.MAX_THREAD_COUNT);
         mExecutor = new ThreadPoolExecutor(mThreadCount, mThreadCount, 20, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
         mCurrentTaskList = new HashMap<>();
         mQueue = (LinkedBlockingQueue<Runnable>) mExecutor.getQueue();
@@ -157,10 +157,12 @@ public class DownloadManager {
      * cancel task
      */
     public void cancelTask(DownloadTask task) {
-        if(task == null) return;
+        if (task == null) {
+            return;
+        }
         TaskEntity taskEntity = task.getTaskEntity();
         if (taskEntity != null) {
-            if(task.getTaskEntity().getTaskStatus() == TaskStatus.TASK_STATUS_DOWNLOADING){
+            if (task.getTaskEntity().getTaskStatus() == TaskStatus.TASK_STATUS_DOWNLOADING) {
                 pauseTask(task);
                 mExecutor.remove(task);
             }
@@ -174,7 +176,9 @@ public class DownloadManager {
                 File temp = new File(taskEntity.getFilePath(), taskEntity.getFileName());
                 if (temp.exists()) {
                     if (temp.delete()) {
-                        if (BuildConfig.DEBUG) Log.d("DownloadManager", "delete temp file!");
+                        if (BuildConfig.DEBUG) {
+                            Log.d("DownloadManager", "delete temp file!");
+                        }
                     }
                 }
             }
