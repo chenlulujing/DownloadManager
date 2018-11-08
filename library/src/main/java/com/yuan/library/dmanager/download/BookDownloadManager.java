@@ -7,6 +7,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.yuan.library.BuildConfig;
+import com.yuan.library.dmanager.controller.DownLoadController;
 import com.yuan.library.dmanager.db.DaoManager;
 import com.yuan.library.dmanager.utils.Constants;
 
@@ -37,7 +38,16 @@ public class BookDownloadManager {
     // the thread count
     private int mThreadCount = 1;
 
-    // task list
+
+    /**
+     * // task list  内存管理
+     * //put
+     * 1、getDownLoadTaskByTaskId（）
+     * 2、addTask()
+     * <p>
+     * //remove
+     * 1、
+     */
     private Map<String, DownloadTask> mCurrentTaskList;
 
     // greenDao seesion
@@ -80,7 +90,7 @@ public class BookDownloadManager {
 
         recoveryTaskState();
         mClient = client;
-        mThreadCount = threadCount < 1 ? 1 :( threadCount <= Constants.MAX_THREAD_COUNT ? threadCount : Constants.MAX_THREAD_COUNT);
+        mThreadCount = threadCount < 1 ? 1 : (threadCount <= Constants.MAX_THREAD_COUNT ? threadCount : Constants.MAX_THREAD_COUNT);
         mExecutor = new ThreadPoolExecutor(mThreadCount, mThreadCount, 20, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
         mCurrentTaskList = new HashMap<>();
         mQueue = (LinkedBlockingQueue<Runnable>) mExecutor.getQueue();
@@ -136,7 +146,6 @@ public class BookDownloadManager {
     }
 
 
-
     /**
      * pauseTask task
      */
@@ -187,10 +196,11 @@ public class BookDownloadManager {
         }
     }
 
+
     /**
      * @return task
      */
-    public DownloadTask getTask(String id) {
+    public DownloadTask getDownLoadTaskByTaskId(String id) {
         DownloadTask currTask = mCurrentTaskList.get(id);
         if (currTask == null) {
             TaskEntity entity = DaoManager.instance().queryWidthId(id);
@@ -199,6 +209,97 @@ public class BookDownloadManager {
                 currTask = new DownloadTask(entity);
                 if (status != TaskStatus.TASK_STATUS_FINISH) {
                     mCurrentTaskList.put(id, currTask);
+                }
+            }
+        }
+        return currTask;
+    }
+
+    /**
+     * 章节第一次下载
+     */
+    public void addChapter2Download(PlayChapterDescriptor chapter) {
+
+
+        TaskEntity taskEntity = DownLoadController.getDownLoadInfoByNet(chapter);
+        DownloadTask downloadTask = new DownloadTask(taskEntity);
+        addTask(downloadTask);
+
+
+    }
+
+
+    /**
+     * 检查章节下载状态
+     * <p>
+     * 正在下载
+     * 已经下载
+     * 未下载
+     */
+    public TaskEntity getTaskEntity(PlayChapterDescriptor chapter) {
+
+        TaskEntity taskEntity = DownLoadController.getDownloadInfoByMemoryByChapter(chapter);
+        if (taskEntity == null) {
+            TaskEntity dataBaseTaskEntity = DaoManager.instance().queryWidthId(chapter.chapterId);
+            if (dataBaseTaskEntity != null) {
+                return dataBaseTaskEntity;
+            }
+        }
+        return taskEntity;
+    }
+
+
+    /**
+     * @return DownloadTask
+     */
+    public DownloadTask getDownloadTask(PlayChapterDescriptor chapter) {
+        DownloadTask currTask = mCurrentTaskList.get(chapter.chapterId);
+        if (currTask == null) {
+            TaskEntity entity = DownLoadController.getDownloadInfoByMemoryByChapter(chapter);
+            if (entity != null) {
+                int status = entity.getTaskStatus();
+                currTask = new DownloadTask(entity);
+                if (status != TaskStatus.TASK_STATUS_FINISH) {
+                    mCurrentTaskList.put(chapter.chapterId, currTask);
+                }
+                Log.i("ll_dl","从全局内存中获取 chapterid="+chapter.chapterId);
+            } else {
+                entity = DaoManager.instance().queryWidthId(chapter.chapterId);
+                if (entity != null) {
+                    int status = entity.getTaskStatus();
+                    currTask = new DownloadTask(entity);
+                    if (status != TaskStatus.TASK_STATUS_FINISH) {
+                        mCurrentTaskList.put(chapter.chapterId, currTask);
+                    }
+                    Log.i("ll_dl","从数据库中获取 chapterid="+chapter.chapterId);
+                } else {
+                    entity = DownLoadController.getDownLoadInfoByNet(chapter);
+                    if (entity != null) {
+                        mCurrentTaskList.put(chapter.chapterId, new DownloadTask(entity));
+                    }
+                    Log.i("ll_dl","从网络获取 chapterid="+chapter.chapterId);
+                }
+            }
+        }
+        Log.i("ll_dl","从下载内存获取 chapterid="+chapter.chapterId);
+        return currTask;
+    }
+
+
+
+
+    /**
+     * @return task
+     */
+    public DownloadTask getDownLoadTaskByPlayerChapter(PlayChapterDescriptor chapter) {
+        DownloadTask currTask = mCurrentTaskList.get(chapter.chapterId);
+        if (currTask == null) {
+            TaskEntity entity = DaoManager.instance().queryWidthId(chapter.chapterId);
+            if (entity != null) {
+                int status = entity.getTaskStatus();
+                currTask = new DownloadTask(entity);
+                if (status != TaskStatus.TASK_STATUS_FINISH) {
+                    mCurrentTaskList.put(chapter.chapterId, currTask);
                 }
             }
         }
