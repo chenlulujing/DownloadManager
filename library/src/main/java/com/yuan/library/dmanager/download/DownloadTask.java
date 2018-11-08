@@ -7,6 +7,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.yuan.library.dmanager.db.DaoManager;
+import com.yuan.library.dmanager.net.NetData;
 import com.yuan.library.dmanager.utils.FileUtils;
 import com.yuan.library.dmanager.utils.IOUtils;
 
@@ -18,11 +19,15 @@ import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
+import java.util.HashMap;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import retrofit2.Call;
+
+import static com.yuan.library.dmanager.controller.DownLoadController.apiRetrofit;
 
 /**
  * Created by Yuan on 27/09/2016:10:44 AM.
@@ -102,6 +107,30 @@ public class DownloadTask implements Runnable {
             long completedSize = mTaskEntity.getCompletedSize();
             Request request;
             try {
+                if(mTaskEntity.isExpired()){
+                    Log.i("ll_dl","url过期，重新请求");
+                    try {
+                        NetData api = apiRetrofit.createApi(NetData.class);
+                        HashMap<String, String> paramsMap = new HashMap<>();
+                        Call<DownloadFileInfoModel> call = api.getNetData(paramsMap);
+                        retrofit2.Response<DownloadFileInfoModel> response = call.execute();
+                        if ((response != null) && (response.body() != null)) {
+                            Log.i("ll_dl","getDownLoadInfoByNet success url=="+response.body().data.getUrl());
+                            mTaskEntity.setUrl(response.body().data.getUrl());
+                        }else {
+                            Log.i("ll_dl","getDownLoadInfoByNet fail");
+                            mTaskEntity.setTaskStatus(TaskStatus.TASK_STATUS_STORAGE_ERROR);
+                            handler.sendEmptyMessage(TaskStatus.TASK_STATUS_STORAGE_ERROR);
+                            return;
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Log.i("ll_dl","getDownLoadInfoByNet fail");
+                        mTaskEntity.setTaskStatus(TaskStatus.TASK_STATUS_STORAGE_ERROR);
+                        handler.sendEmptyMessage(TaskStatus.TASK_STATUS_STORAGE_ERROR);
+                        return;
+                    }
+                }
                 request = new Request.Builder().url(mTaskEntity.getUrl()).header("RANGE", "bytes=" + completedSize + "-").build();
             } catch (IllegalArgumentException e) {
                 mTaskEntity.setTaskStatus(TaskStatus.TASK_STATUS_REQUEST_ERROR);
@@ -131,7 +160,9 @@ public class DownloadTask implements Runnable {
                     byte[] buffer = new byte[1024];
                     int length;
                     int buffOffset = 0;
-                    while ((length = bis.read(buffer)) > 0 && mTaskEntity.getTaskStatus() != TaskStatus.TASK_STATUS_CANCEL && mTaskEntity.getTaskStatus() != TaskStatus.TASK_STATUS_PAUSE) {
+                    while ((length = bis.read(buffer)) > 0
+                            && mTaskEntity.getTaskStatus() != TaskStatus.TASK_STATUS_CANCEL
+                            && mTaskEntity.getTaskStatus() != TaskStatus.TASK_STATUS_PAUSE) {
                         tempFile.write(buffer, 0, length);
                         completedSize += length;
                         buffOffset += length;
