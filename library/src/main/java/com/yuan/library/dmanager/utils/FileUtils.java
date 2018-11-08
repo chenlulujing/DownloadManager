@@ -27,6 +27,24 @@ public class FileUtils {
         return System.currentTimeMillis() + "";
     }
 
+    /**
+     * 获取后缀名称
+     *
+     * @return
+     */
+    public static String getFileNameExtension(String url) {
+        try {
+            if (TextUtils.isEmpty(url)) {
+                return "";
+            }
+            String suffix = url.substring(url.lastIndexOf(".") + 1);
+            return suffix;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "";
+        }
+    }
+
     public static String getDefaultFilePath() {
         String filePath = Environment.getExternalStorageDirectory().getAbsolutePath() + "/okhttp/download/";
         File file = new File(filePath);

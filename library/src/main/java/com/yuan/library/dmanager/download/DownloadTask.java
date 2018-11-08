@@ -87,15 +87,17 @@ public class DownloadTask implements Runnable {
         InputStream inputStream = null;
         BufferedInputStream bis = null;
         RandomAccessFile tempFile = null;
+        File file = null;
+
 
         try {
-
 
             String fileName = TextUtils.isEmpty(mTaskEntity.getFileName()) ? FileUtils.getFileNameFromUrl(mTaskEntity.getUrl()) : mTaskEntity.getFileName();
             String filePath = TextUtils.isEmpty(mTaskEntity.getFilePath()) ? FileUtils.getDefaultFilePath() : mTaskEntity.getFilePath();
             mTaskEntity.setFileName(fileName);
             mTaskEntity.setFilePath(filePath);
-            tempFile = new RandomAccessFile(new File(filePath, fileName), "rwd");
+            file = new File(filePath, fileName);
+            tempFile = new RandomAccessFile(file, "rwd");
 
             mTaskEntity.setTaskStatus(TaskStatus.TASK_STATUS_CONNECTING);
             handler.sendEmptyMessage(TaskStatus.TASK_STATUS_CONNECTING);
@@ -107,29 +109,31 @@ public class DownloadTask implements Runnable {
             long completedSize = mTaskEntity.getCompletedSize();
             Request request;
             try {
-                if(mTaskEntity.isExpired()){
-                    Log.i("ll_dl","url过期，重新请求");
+                if (mTaskEntity.isExpired()) {
+                    Log.i("ll_dl", "url过期，重新请求");
                     try {
                         NetData api = apiRetrofit.createApi(NetData.class);
                         HashMap<String, String> paramsMap = new HashMap<>();
                         Call<DownloadFileInfoModel> call = api.getNetData(paramsMap);
                         retrofit2.Response<DownloadFileInfoModel> response = call.execute();
                         if ((response != null) && (response.body() != null)) {
-                            Log.i("ll_dl","getDownLoadInfoByNet success url=="+response.body().data.getUrl());
+                            Log.i("ll_dl", "getDownLoadInfoByNet success url==" + response.body().data.getUrl());
                             mTaskEntity.setUrl(response.body().data.getUrl());
-                        }else {
-                            Log.i("ll_dl","getDownLoadInfoByNet fail");
+                        } else {
+                            Log.i("ll_dl", "getDownLoadInfoByNet fail");
                             mTaskEntity.setTaskStatus(TaskStatus.TASK_STATUS_STORAGE_ERROR);
                             handler.sendEmptyMessage(TaskStatus.TASK_STATUS_STORAGE_ERROR);
                             return;
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
-                        Log.i("ll_dl","getDownLoadInfoByNet fail");
+                        Log.i("ll_dl", "getDownLoadInfoByNet fail");
                         mTaskEntity.setTaskStatus(TaskStatus.TASK_STATUS_STORAGE_ERROR);
                         handler.sendEmptyMessage(TaskStatus.TASK_STATUS_STORAGE_ERROR);
                         return;
                     }
+                } else {
+                    Log.i("ll_dl", "url未过期");
                 }
                 request = new Request.Builder().url(mTaskEntity.getUrl()).header("RANGE", "bytes=" + completedSize + "-").build();
             } catch (IllegalArgumentException e) {
@@ -175,6 +179,15 @@ public class DownloadTask implements Runnable {
                         }
 
                         if (completedSize == mTaskEntity.getTotalSize()) {
+                            //给文件命名
+                            String realname =  mTaskEntity.getBookId() + "_" + mTaskEntity.getTaskId() + "." + FileUtils.getFileNameExtension(mTaskEntity.getUrl());
+                            Log.i("ll_dl", "download success reName :"+realname);
+                            File realFile = new File(mTaskEntity.getFilePath(),realname);
+                            if (realFile.exists()) {
+                                realFile.delete();
+                            }
+                            file.renameTo(realFile);
+                            mTaskEntity.setFileName(realname);
                             handler.sendEmptyMessage(TaskStatus.TASK_STATUS_DOWNLOADING);
                             mTaskEntity.setTaskStatus(TaskStatus.TASK_STATUS_FINISH);
                             handler.sendEmptyMessage(TaskStatus.TASK_STATUS_FINISH);

@@ -12,9 +12,10 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.yuan.library.dmanager.download.DownloadManager;
+import com.yuan.library.dmanager.download.BookDownloadManager;
 import com.yuan.library.dmanager.download.DownloadTask;
 import com.yuan.library.dmanager.download.DownloadTaskListener;
+import com.yuan.library.dmanager.download.PlayChapterDescriptor;
 import com.yuan.library.dmanager.download.TaskEntity;
 
 import java.text.DecimalFormat;
@@ -45,12 +46,10 @@ class BookAdapter extends RecyclerView.Adapter<BookAdapter.CViewHolder> {
 
     private List<TestEntity> mListData;
 
-    private DownloadManager mDownloadManager;
 
     BookAdapter(Context context, List<TestEntity> list) {
         mContext = context;
         mListData = list;
-        mDownloadManager = DownloadManager.getInstance();
     }
 
     @Override
@@ -65,12 +64,16 @@ class BookAdapter extends RecyclerView.Adapter<BookAdapter.CViewHolder> {
         final TestEntity entity = mListData.get(holder.getAdapterPosition());
         holder.titleView.setText(entity.getTitle());
 
-        if(TextUtils.isEmpty( entity.getUrl())){
+        if (TextUtils.isEmpty(entity.getUrl())) {
             entity.setUrl("the item of " + holder.getAdapterPosition() + " is empty url...");
         }
         holder.itemView.setTag(entity.getUrl());
-        String taskId = String.valueOf(entity.getUrl().hashCode());
-        DownloadTask itemTask = mDownloadManager.getTask(taskId);
+        String taskId = String.valueOf(position);
+        final PlayChapterDescriptor item = new PlayChapterDescriptor();
+        item.chapterId = taskId;
+        item.bookId = taskId;
+        DownloadTask itemTask = BookDownloadManager.getInstance().getDownloadTask(item);
+
 
         if (itemTask == null) {
             holder.downloadButton.setText(R.string.start);
@@ -83,8 +86,8 @@ class BookAdapter extends RecyclerView.Adapter<BookAdapter.CViewHolder> {
             String progress = getPercent(taskEntity.getCompletedSize(), taskEntity.getTotalSize());
             switch (status) {
                 case TASK_STATUS_INIT:
-                    boolean isPause = mDownloadManager.isPauseTask(taskEntity.getTaskId());
-                    boolean isFinish = mDownloadManager.isFinishTask(taskEntity.getTaskId());
+                    boolean isPause = BookDownloadManager.getInstance().isPauseTask(taskEntity.getTaskId());
+                    boolean isFinish = BookDownloadManager.getInstance().isFinishTask(taskEntity.getTaskId());
                     holder.downloadButton.setText(isFinish ? R.string.delete : !isPause ? R.string.start : R.string.resume);
                     holder.progressBar.setProgress(Integer.parseInt(progress));
                     holder.progressView.setText(progress);
@@ -131,44 +134,49 @@ class BookAdapter extends RecyclerView.Adapter<BookAdapter.CViewHolder> {
             @Override
             public void onClick(View v) {
                 String url = entity.getUrl();
-                String taskId = String.valueOf(url.hashCode());
-                DownloadTask itemTask = mDownloadManager.getTask(taskId);
+                String taskId = String.valueOf(position);
+
+
+                final PlayChapterDescriptor item = new PlayChapterDescriptor();
+                item.chapterId = taskId;
+                item.bookId = taskId;
+                DownloadTask itemTask = BookDownloadManager.getInstance().getDownloadTask(item);
 
                 if (itemTask == null) {
                     itemTask = new DownloadTask(new TaskEntity.Builder().url(entity.getUrl()).build());
                     responseUIListener(itemTask, holder);
-                    mDownloadManager.addTask(itemTask);
+                    BookDownloadManager.getInstance().addTask(itemTask);
                 } else {
                     responseUIListener(itemTask, holder);
                     TaskEntity taskEntity = itemTask.getTaskEntity();
                     int status = taskEntity.getTaskStatus();
                     switch (status) {
                         case TASK_STATUS_QUEUE:
-                            mDownloadManager.pauseTask(itemTask);
+                            BookDownloadManager.getInstance().pauseTask(itemTask);
                             break;
                         case TASK_STATUS_INIT:
-                            mDownloadManager.addTask(itemTask);
+                            BookDownloadManager.getInstance().addTask(itemTask);
                             break;
                         case TASK_STATUS_CONNECTING:
-                            mDownloadManager.pauseTask(itemTask);
+                            BookDownloadManager.getInstance().pauseTask(itemTask);
                             break;
                         case TASK_STATUS_DOWNLOADING:
-                            mDownloadManager.pauseTask(itemTask);
+                            BookDownloadManager.getInstance().pauseTask(itemTask);
                             break;
                         case TASK_STATUS_CANCEL:
-                            mDownloadManager.addTask(itemTask);
+                            BookDownloadManager.getInstance().addTask(itemTask);
                             break;
                         case TASK_STATUS_PAUSE:
-                            mDownloadManager.resumeTask(itemTask);
+                            BookDownloadManager.getInstance().resumeTask(itemTask);
                             break;
                         case TASK_STATUS_FINISH:
-                            mDownloadManager.cancelTask(itemTask);
+                            BookDownloadManager.getInstance().cancelTask(itemTask);
                             break;
                         case TASK_STATUS_REQUEST_ERROR:
-                            mDownloadManager.addTask(itemTask);
+                            BookDownloadManager.getInstance().addTask(itemTask);
                             break;
                         case TASK_STATUS_STORAGE_ERROR:
-                            mDownloadManager.addTask(itemTask);
+                            BookDownloadManager.getInstance().addTask(itemTask);
                             break;
                     }
                 }
